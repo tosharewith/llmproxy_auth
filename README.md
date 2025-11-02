@@ -30,17 +30,116 @@ Formerly known as Bedrock IAM Proxy.
 
 ## Architecture
 
+### High-Level Architecture
+
+```mermaid
+graph TB
+    subgraph "Client Applications"
+        C1[OpenAI SDK Client]
+        C2[Native API Client]
+        C3[Custom Application]
+    end
+
+    subgraph "LLM Proxy Auth Gateway (EKS Pod)"
+        subgraph "Authentication Layer"
+            AUTH[API Key / 2FA / OAuth2]
+        end
+
+        subgraph "Dual-Mode Routing"
+            TRANSPARENT[Transparent Mode<br/>/transparent/*<br/>Auth-only passthrough]
+            PROTOCOL[Protocol Mode<br/>/{protocol}/*<br/>Request/Response Translation]
+        end
+
+        subgraph "Provider Handlers"
+            P1[Bedrock Handler<br/>AWS SigV4 + IRSA]
+            P2[OpenAI Handler<br/>API Key Auth]
+            P3[Anthropic Handler<br/>API Key Auth]
+            P4[Azure Handler<br/>API Key Auth]
+            P5[Vertex Handler<br/>GCP OAuth2]
+            P6[IBM Handler<br/>Bearer Token]
+            P7[Oracle Handler<br/>Bearer Token]
+        end
+    end
+
+    subgraph "AI Providers"
+        BEDROCK[AWS Bedrock<br/>VPC Endpoint]
+        OPENAI[OpenAI API]
+        ANTHROPIC[Anthropic API]
+        AZURE[Azure OpenAI]
+        VERTEX[Google Vertex AI]
+        IBM[IBM watsonx.ai]
+        ORACLE[Oracle Cloud AI]
+    end
+
+    subgraph "AWS IAM"
+        IRSA[IAM Role IRSA<br/>Auto-rotated credentials]
+    end
+
+    C1 & C2 & C3 --> AUTH
+    AUTH --> TRANSPARENT
+    AUTH --> PROTOCOL
+
+    TRANSPARENT --> P1 & P2 & P3 & P4 & P5 & P6 & P7
+    PROTOCOL --> P1 & P2 & P3 & P4 & P5 & P6 & P7
+
+    P1 --> IRSA
+    IRSA --> BEDROCK
+    P2 --> OPENAI
+    P3 --> ANTHROPIC
+    P4 --> AZURE
+    P5 --> VERTEX
+    P6 --> IBM
+    P7 --> ORACLE
+
+    style AUTH fill:#e1f5ff
+    style TRANSPARENT fill:#fff4e1
+    style PROTOCOL fill:#ffe1f5
+    style IRSA fill:#e8f5e9
 ```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Client        │───▶│  Bedrock Proxy  │───▶│  AWS Bedrock    │
-│                 │    │  (EKS Pod)      │    │  (VPC Endpoint) │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-                              │
-                              ▼
-                       ┌─────────────────┐
-                       │   IAM Role      │
-                       │   (IRSA)        │
-                       └─────────────────┘
+
+### Dual-Mode Architecture
+
+The gateway supports two operational modes:
+
+**Transparent Mode** (`/transparent/{provider}`):
+- Authentication-only passthrough
+- Preserves native provider APIs
+- Minimal transformation
+- Best for provider-specific features
+
+**Protocol Mode** (`/{protocol}/{instance}`):
+- OpenAI-compatible API
+- Request/response translation
+- Multi-provider abstraction
+- Best for standardization
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Gateway
+    participant Provider
+
+    rect rgb(255, 244, 225)
+    Note over Client,Provider: Transparent Mode
+    Client->>Gateway: POST /transparent/bedrock/model/claude-3/invoke<br/>(Native Bedrock format)
+    Gateway->>Gateway: Authenticate API Key
+    Gateway->>Gateway: Add AWS SigV4 signature
+    Gateway->>Provider: Forward unchanged request
+    Provider-->>Gateway: Native response
+    Gateway-->>Client: Return unchanged response
+    end
+
+    rect rgb(255, 225, 245)
+    Note over Client,Provider: Protocol Mode (OpenAI-compatible)
+    Client->>Gateway: POST /openai/bedrock_us1/chat/completions<br/>(OpenAI format)
+    Gateway->>Gateway: Authenticate API Key
+    Gateway->>Gateway: Translate OpenAI → Bedrock format
+    Gateway->>Gateway: Add AWS SigV4 signature
+    Gateway->>Provider: Send translated request
+    Provider-->>Gateway: Native response
+    Gateway->>Gateway: Translate Bedrock → OpenAI format
+    Gateway-->>Client: Return OpenAI-formatted response
+    end
 ```
 
 ## Quick Start
@@ -164,18 +263,38 @@ curl -X POST https://localhost:8443/v1/bedrock/invoke-model \
 
 ### 🔐 Multi-Layer Security Architecture
 
-```
-┌─────────────────────────────────────────────────┐
-│  Layer 1: Network (VPC, Security Groups)        │
-├─────────────────────────────────────────────────┤
-│  Layer 2: Kubernetes (RBAC, Network Policies)   │
-├─────────────────────────────────────────────────┤
-│  Layer 3: Application Auth (API Keys, OAuth2)   │
-├─────────────────────────────────────────────────┤
-│  Layer 4: 2FA/TOTP (Google Authenticator)       │
-├─────────────────────────────────────────────────┤
-│  Layer 5: AWS IAM (IRSA, Bedrock Access)        │
-└─────────────────────────────────────────────────┘
+```mermaid
+graph LR
+    subgraph "Layer 1: Network Security"
+        L1[VPC<br/>Security Groups<br/>Private Subnets]
+    end
+
+    subgraph "Layer 2: Kubernetes Security"
+        L2[RBAC<br/>Network Policies<br/>Pod Security]
+    end
+
+    subgraph "Layer 3: Application Auth"
+        L3[API Keys<br/>OAuth2<br/>Service Accounts]
+    end
+
+    subgraph "Layer 4: Multi-Factor Auth"
+        L4[TOTP/2FA<br/>Google Authenticator<br/>Backup Codes]
+    end
+
+    subgraph "Layer 5: Provider Auth"
+        L5[AWS IAM IRSA<br/>GCP Workload Identity<br/>API Key Management]
+    end
+
+    L1 --> L2
+    L2 --> L3
+    L3 --> L4
+    L4 --> L5
+
+    style L1 fill:#ffebee
+    style L2 fill:#e8f5e9
+    style L3 fill:#e3f2fd
+    style L4 fill:#fff3e0
+    style L5 fill:#f3e5f5
 ```
 
 ### Authentication Methods

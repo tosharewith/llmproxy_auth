@@ -1,68 +1,49 @@
-# Bedrock Proxy Architecture
+# LLM Proxy Auth Architecture
 
 ## 🏗️ Two-Layer Authentication Architecture
 
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                         USER'S LAPTOP (No AWS Creds)                     │
-│                                                                           │
-│  Alice:   API Key = bdrk_a1b2c3d4...                                     │
-│  Bob:     API Key = bdrk_f7e8d9c0...                                     │
-│  Charlie: API Key = bdrk_x9y8z7w6...                                     │
-└─────────────────────────────────────────────────────────────────────────┘
-                                    │
-                                    │ HTTPS + X-API-Key Header
-                                    ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│                        LAYER 1: API KEY AUTH                             │
-│                        (User → Proxy)                                    │
-│                                                                           │
-│  ┌──────────────────────────────────────────────────────────────┐       │
-│  │  Bedrock Proxy (EKS Pod)                                     │       │
-│  │                                                               │       │
-│  │  1. Receive request with X-API-Key header                    │       │
-│  │  2. Validate API key against SQLite database                 │       │
-│  │  3. Check if key is active, not expired                      │       │
-│  │  4. Optional: Validate TOTP if 2FA enabled                   │       │
-│  │  5. Log audit trail (user, IP, path, timestamp)              │       │
-│  │                                                               │       │
-│  │  ✅ Valid Key   → Continue to Layer 2                        │       │
-│  │  ❌ Invalid Key → 401 Unauthorized                           │       │
-│  └──────────────────────────────────────────────────────────────┘       │
-└─────────────────────────────────────────────────────────────────────────┘
-                                    │
-                                    │ Request approved
-                                    ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│                        LAYER 2: IAM/IRSA AUTH                            │
-│                        (Proxy → AWS Bedrock)                             │
-│                                                                           │
-│  ┌──────────────────────────────────────────────────────────────┐       │
-│  │  AWS Credential Chain (Automatic)                            │       │
-│  │                                                               │       │
-│  │  1. Check AWS_ROLE_ARN env var (from IRSA annotation)       │       │
-│  │  2. Read /var/run/secrets/.../token (K8s service account)   │       │
-│  │  3. Call AWS STS AssumeRoleWithWebIdentity                   │       │
-│  │  4. Get temporary AWS credentials (auto-rotated)             │       │
-│  │  5. Sign request with AWS Signature V4                       │       │
-│  │                                                               │       │
-│  │  ✅ Valid IAM  → Forward to Bedrock                          │       │
-│  │  ❌ Invalid IAM → 403 Forbidden                              │       │
-│  └──────────────────────────────────────────────────────────────┘       │
-└─────────────────────────────────────────────────────────────────────────┘
-                                    │
-                                    │ AWS SigV4 signed request
-                                    ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│                           AWS BEDROCK RUNTIME                            │
-│                                                                           │
-│  ┌──────────────────────────────────────────────────────────────┐       │
-│  │  - Validates IAM signature                                   │       │
-│  │  - Checks IAM role permissions                               │       │
-│  │  - Processes model invocation                                │       │
-│  │  - Returns response                                          │       │
-│  └──────────────────────────────────────────────────────────────┘       │
-└─────────────────────────────────────────────────────────────────────────┘
+```mermaid
+sequenceDiagram
+    participant Users as User's Laptop<br/>(Alice, Bob, Charlie)
+    participant Gateway as LLM Proxy Gateway<br/>(EKS Pod)
+    participant IRSA as AWS IRSA<br/>(IAM Role)
+    participant Providers as AI Providers<br/>(Bedrock, OpenAI, etc)
+
+    Note over Users: No AWS credentials needed<br/>Only API Key required
+
+    rect rgb(227, 242, 253)
+    Note over Users,Gateway: Layer 1: API Key Authentication
+    Users->>Gateway: HTTPS Request<br/>X-API-Key: bdrk_alice_key
+    Gateway->>Gateway: 1. Validate API key (SQLite DB)
+    Gateway->>Gateway: 2. Check if active & not expired
+    Gateway->>Gateway: 3. Validate TOTP (if 2FA enabled)
+    Gateway->>Gateway: 4. Log audit trail<br/>(user, IP, path, timestamp)
+    alt Valid API Key
+        Gateway->>Gateway: ✅ Continue to Layer 2
+    else Invalid API Key
+        Gateway-->>Users: ❌ 401 Unauthorized
+    end
+    end
+
+    rect rgb(232, 245, 233)
+    Note over Gateway,Providers: Layer 2: Provider Authentication (Automatic)
+    Gateway->>Gateway: Read AWS_ROLE_ARN from env
+    Gateway->>Gateway: Read K8s service account token
+    Gateway->>IRSA: AssumeRoleWithWebIdentity
+    IRSA-->>Gateway: Temporary AWS credentials<br/>(auto-rotated)
+    Gateway->>Gateway: Sign request with AWS SigV4
+    Gateway->>Providers: Forward signed request
+    alt Valid IAM
+        Providers->>Providers: ✅ Validate signature
+        Providers->>Providers: Check IAM permissions
+        Providers->>Providers: Process request
+        Providers-->>Gateway: Response
+        Gateway-->>Users: Response
+    else Invalid IAM
+        Providers-->>Gateway: ❌ 403 Forbidden
+        Gateway-->>Users: ❌ 403 Forbidden
+    end
+    end
 ```
 
 ---
