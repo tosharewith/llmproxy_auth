@@ -1,0 +1,26 @@
+# Gitleaks ignore file for false positives
+# These are example/placeholder values in documentation, not real secrets
+
+# Documentation examples in ARCHITECTURE.md
+docs/ARCHITECTURE.md:curl-auth-header:93
+docs/ARCHITECTURE.md:curl-auth-header:313
+docs/ARCHITECTURE.md:generic-api-key:10
+docs/ARCHITECTURE.md:generic-api-key:11
+docs/ARCHITECTURE.md:generic-api-key:94
+
+# Documentation examples in IMPLEMENTATION-STATUS.md
+docs/IMPLEMENTATION-STATUS.md:curl-auth-header:173
+docs/IMPLEMENTATION-STATUS.md:curl-auth-header:186
+
+# Documentation examples in AUTHORIZATION.md
+docs/AUTHORIZATION.md:curl-auth-header:363
+docs/AUTHORIZATION.md:curl-auth-header:367
+docs/AUTHORIZATION.md:curl-auth-user:122
+
+# Documentation examples in SECURITY-QUICKSTART.md
+docs/SECURITY-QUICKSTART.md:curl-auth-header:191
+docs/SECURITY-QUICKSTART.md:curl-auth-header:195
+
+# Test scripts with example values
+examples/**/*
+test-*.sh

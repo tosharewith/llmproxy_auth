@@ -1,0 +1,349 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ai-gateway-provider-config
+  namespace: bedrock-system
+  labels:
+    app: ai-gateway
+    component: configuration
+data:
+  provider-instances.yaml: |
+    # Provider Instances Configuration
+    # This ConfigMap contains non-sensitive configuration
+    # Secrets are injected via environment variables from Kubernetes Secrets
+
+    global:
+      metrics:
+        enabled: true
+        capture_request_body: false
+        capture_response_body: false
+      default_timeout: 120s
+      authentication:
+        allow_env_vars: true
+
+    instances:
+      # ==========================================
+      # AWS Bedrock Instances
+      # ==========================================
+      # Uses IAM Roles for Service Accounts (IRSA)
+      # No secrets needed - authentication via IAM role
+
+      bedrock_transparent:
+        type: bedrock
+        mode: transparent
+        description: "AWS Bedrock native API with IAM authentication"
+        region: us-east-1
+        authentication:
+          type: aws_sigv4
+          service: bedrock-runtime
+          region: ${AWS_REGION:-us-east-1}
+        endpoints:
+          - path: /transparent/bedrock
+            methods: [GET, POST, PUT, DELETE]
+          - path: /transparent/bedrock-runtime
+            methods: [GET, POST]
+        metrics:
+          enabled: true
+          labels:
+            provider: bedrock
+            mode: transparent
+            region: us-east-1
+
+      bedrock_us1_openai:
+        type: bedrock
+        mode: protocol
+        protocol: openai
+        description: "AWS Bedrock via OpenAI-compatible API (us-east-1)"
+        region: us-east-1
+        authentication:
+          type: aws_sigv4
+          service: bedrock-runtime
+          region: us-east-1
+        transformation:
+          request_from: openai
+          request_to: bedrock_converse
+          response_from: bedrock_converse
+          response_to: openai
+          options:
+            default_max_tokens: 4096
+            preserve_original_model_id: false
+        endpoints:
+          - path: /openai/bedrock_us1_openai
+            methods: [POST]
+          - path: /openai/bedrock_us1
+            methods: [POST]
+          - path: /openai/bedrock
+            methods: [POST]
+        metrics:
+          enabled: true
+          labels:
+            provider: bedrock
+            mode: protocol
+            protocol: openai
+            region: us-east-1
+
+      bedrock_eu1_openai:
+        type: bedrock
+        mode: protocol
+        protocol: openai
+        description: "AWS Bedrock via OpenAI-compatible API (eu-west-1)"
+        region: eu-west-1
+        authentication:
+          type: aws_sigv4
+          service: bedrock-runtime
+          region: eu-west-1
+        transformation:
+          request_from: openai
+          request_to: bedrock_converse
+          response_from: bedrock_converse
+          response_to: openai
+        endpoints:
+          - path: /openai/bedrock_eu1_openai
+            methods: [POST]
+          - path: /openai/bedrock_eu1
+            methods: [POST]
+        metrics:
+          enabled: true
+          labels:
+            provider: bedrock
+            mode: protocol
+            protocol: openai
+            region: eu-west-1
+
+      # ==========================================
+      # OpenAI Instances
+      # ==========================================
+      # Uses API key from Kubernetes Secret
+      # Environment variable: OPENAI_API_KEY
+
+      openai_transparent:
+        type: openai
+        mode: transparent
+        description: "OpenAI native API with authentication"
+        base_url: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
+        authentication:
+          type: bearer_token
+          token: ${OPENAI_API_KEY}  # Injected from Secret
+        endpoints:
+          - path: /transparent/openai
+            methods: [GET, POST]
+        metrics:
+          enabled: true
+          labels:
+            provider: openai
+            mode: transparent
+
+      openai_openai:
+        type: openai
+        mode: protocol
+        protocol: openai
+        description: "OpenAI via standardized OpenAI protocol"
+        base_url: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
+        authentication:
+          type: bearer_token
+          token: ${OPENAI_API_KEY}  # Injected from Secret
+        transformation:
+          request_from: openai
+          request_to: openai
+          response_from: openai
+          response_to: openai
+        endpoints:
+          - path: /openai/openai
+            methods: [POST]
+        metrics:
+          enabled: true
+          labels:
+            provider: openai
+            mode: protocol
+            protocol: openai
+
+      # ==========================================
+      # Anthropic Instances
+      # ==========================================
+      # Uses API key from Kubernetes Secret
+      # Environment variable: ANTHROPIC_API_KEY
+
+      anthropic_transparent:
+        type: anthropic
+        mode: transparent
+        description: "Anthropic native Messages API with authentication"
+        base_url: ${ANTHROPIC_BASE_URL:-https://api.anthropic.com/v1}
+        api_version: "2023-06-01"
+        authentication:
+          type: api_key
+          header: x-api-key
+          key: ${ANTHROPIC_API_KEY}  # Injected from Secret
+        endpoints:
+          - path: /transparent/anthropic
+            methods: [POST]
+        metrics:
+          enabled: true
+          labels:
+            provider: anthropic
+            mode: transparent
+
+      anthropic_openai:
+        type: anthropic
+        mode: protocol
+        protocol: openai
+        description: "Anthropic Claude via OpenAI-compatible API"
+        base_url: ${ANTHROPIC_BASE_URL:-https://api.anthropic.com/v1}
+        api_version: "2023-06-01"
+        authentication:
+          type: api_key
+          header: x-api-key
+          key: ${ANTHROPIC_API_KEY}  # Injected from Secret
+        transformation:
+          request_from: openai
+          request_to: anthropic_messages
+          response_from: anthropic_messages
+          response_to: openai
+          options:
+            ensure_max_tokens: true
+            default_max_tokens: 4096
+        endpoints:
+          - path: /openai/anthropic
+            methods: [POST]
+          - path: /openai/claude
+            methods: [POST]
+        metrics:
+          enabled: true
+          labels:
+            provider: anthropic
+            mode: protocol
+            protocol: openai
+
+      # ==========================================
+      # Azure OpenAI Instances
+      # ==========================================
+      # Uses API key from Kubernetes Secret
+      # Environment variables: AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY
+
+      azure_transparent:
+        type: azure
+        mode: transparent
+        description: "Azure OpenAI native API with authentication"
+        endpoint: ${AZURE_OPENAI_ENDPOINT}  # Injected from Secret or ConfigMap
+        api_version: ${AZURE_API_VERSION:-2024-02-15-preview}
+        authentication:
+          type: api_key
+          header: api-key
+          key: ${AZURE_OPENAI_API_KEY}  # Injected from Secret
+        endpoints:
+          - path: /transparent/azure
+            methods: [GET, POST]
+        metrics:
+          enabled: true
+          labels:
+            provider: azure
+            mode: transparent
+
+      azure_openai:
+        type: azure
+        mode: protocol
+        protocol: openai
+        description: "Azure OpenAI via standardized OpenAI protocol"
+        endpoint: ${AZURE_OPENAI_ENDPOINT}
+        api_version: ${AZURE_API_VERSION:-2024-02-15-preview}
+        authentication:
+          type: api_key
+          header: api-key
+          key: ${AZURE_OPENAI_API_KEY}  # Injected from Secret
+        transformation:
+          request_from: openai
+          request_to: openai
+          response_from: openai
+          response_to: openai
+        endpoints:
+          - path: /openai/azure
+            methods: [POST]
+        metrics:
+          enabled: true
+          labels:
+            provider: azure
+            mode: protocol
+            protocol: openai
+
+      # ==========================================
+      # Google Vertex AI Instances
+      # ==========================================
+      # Uses OAuth2 token or Application Default Credentials
+      # Environment variables: GCP_PROJECT_ID, GCP_ACCESS_TOKEN
+
+      vertex_transparent:
+        type: vertex
+        mode: transparent
+        description: "Google Vertex AI native API with authentication"
+        project_id: ${GCP_PROJECT_ID}  # Injected from ConfigMap or Secret
+        location: ${GCP_LOCATION:-us-central1}
+        authentication:
+          type: gcp_oauth2
+          token: ${GCP_ACCESS_TOKEN}  # Injected from Secret
+        endpoints:
+          - path: /transparent/vertex
+            methods: [POST]
+        metrics:
+          enabled: true
+          labels:
+            provider: vertex
+            mode: transparent
+
+      vertex_openai:
+        type: vertex
+        mode: protocol
+        protocol: openai
+        description: "Google Vertex AI (Gemini) via OpenAI-compatible API"
+        project_id: ${GCP_PROJECT_ID}
+        location: ${GCP_LOCATION:-us-central1}
+        authentication:
+          type: gcp_oauth2
+          token: ${GCP_ACCESS_TOKEN}
+        transformation:
+          request_from: openai
+          request_to: vertex_gemini
+          response_from: vertex_gemini
+          response_to: openai
+          options:
+            role_mapping:
+              assistant: model
+              user: user
+        endpoints:
+          - path: /openai/vertex
+            methods: [POST]
+          - path: /openai/gemini
+            methods: [POST]
+        metrics:
+          enabled: true
+          labels:
+            provider: vertex
+            mode: protocol
+            protocol: openai
+
+    # Routing rules
+    routing:
+      defaults:
+        bedrock: bedrock_us1_openai
+        azure: azure_openai
+        openai: openai_openai
+        anthropic: anthropic_openai
+        vertex: vertex_openai
+      path_based:
+        enabled: true
+      fallback:
+        enabled: true
+        use_default: true
+
+    # Feature flags
+    features:
+      transparent_mode:
+        enabled: true
+        description: "Enable transparent passthrough endpoints"
+      protocol_mode:
+        enabled: true
+        description: "Enable protocol-based transformation endpoints"
+      metrics_per_instance:
+        enabled: true
+        description: "Track metrics separately for each instance"
+      request_validation:
+        enabled: true
+        description: "Validate requests before forwarding"

@@ -42,12 +42,17 @@ Thumbs.db
 # Build artifacts
 dist/
 build/output/
+bin/
 *.tar.gz
 *.zip
+*.pid
+server.pid
 
 # Logs
 *.log
 logs/
+server.log
+nohup.out
 
 # Temporary files
 tmp/

@@ -1,0 +1,364 @@
+# Provider Instances Configuration - EXAMPLE FILE
+# Copy this to provider-instances.yaml and configure with your actual values
+#
+# IMPORTANT: This is an EXAMPLE file with placeholder values
+# Do NOT commit real credentials to version control
+#
+# For production use:
+# - Use environment variables for secrets (${VAR_NAME})
+# - Use IAM roles (IRSA) for EKS deployments
+# - Use EC2 instance profiles for EC2 deployments
+
+# Global settings
+global:
+  metrics:
+    enabled: true
+    capture_request_body: false
+    capture_response_body: false
+
+  default_timeout: 120s
+
+  # Default authentication fallback
+  authentication:
+    allow_env_vars: true
+
+# Provider instances
+instances:
+  # ========================================
+  # AWS Bedrock Instances
+  # ========================================
+
+  # Transparent passthrough - original Bedrock API
+  bedrock_transparent:
+    type: bedrock
+    mode: transparent
+    description: "AWS Bedrock native API with authentication only"
+
+    # Region configuration
+    region: us-east-1
+
+    # Authentication - NO CREDENTIALS NEEDED
+    # Uses AWS SDK default credential chain:
+    # 1. Environment variables (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)
+    # 2. EKS IRSA (IAM Roles for Service Accounts)
+    # 3. EC2 instance profile
+    # 4. Shared credentials file (~/.aws/credentials)
+    authentication:
+      type: aws_sigv4
+      service: bedrock-runtime
+      region: ${AWS_REGION:-us-east-1}
+
+    # Endpoints
+    endpoints:
+      - path: /transparent/bedrock
+        methods: [GET, POST, PUT, DELETE]
+      - path: /transparent/bedrock-runtime
+        methods: [GET, POST]
+
+    # Metrics
+    metrics:
+      enabled: true
+      labels:
+        provider: bedrock
+        mode: transparent
+        region: us-east-1
+
+  # OpenAI-compatible Bedrock (US East 1)
+  bedrock_us1_openai:
+    type: bedrock
+    mode: protocol
+    protocol: openai
+    description: "AWS Bedrock via OpenAI-compatible API (us-east-1)"
+
+    region: us-east-1
+
+    # Authentication - Uses IAM role or environment variables
+    authentication:
+      type: aws_sigv4
+      service: bedrock-runtime
+      region: us-east-1
+
+    transformation:
+      request_from: openai
+      request_to: bedrock_converse
+      response_from: bedrock_converse
+      response_to: openai
+
+      options:
+        default_max_tokens: 4096
+        preserve_original_model_id: false
+
+    endpoints:
+      - path: /openai/bedrock_us1
+        methods: [POST]
+      - path: /openai/bedrock_us1_openai
+        methods: [POST]
+      - path: /openai/bedrock
+        methods: [POST]
+
+    metrics:
+      enabled: true
+      labels:
+        provider: bedrock
+        mode: protocol
+        protocol: openai
+        region: us-east-1
+
+  # OpenAI-compatible Bedrock (EU West 1)
+  bedrock_eu1_openai:
+    type: bedrock
+    mode: protocol
+    protocol: openai
+    description: "AWS Bedrock via OpenAI-compatible API (eu-west-1)"
+
+    region: eu-west-1
+
+    authentication:
+      type: aws_sigv4
+      service: bedrock-runtime
+      region: eu-west-1
+
+    transformation:
+      request_from: openai
+      request_to: bedrock_converse
+      response_from: bedrock_converse
+      response_to: openai
+
+    endpoints:
+      - path: /openai/bedrock_eu1
+        methods: [POST]
+      - path: /openai/bedrock_eu1_openai
+        methods: [POST]
+
+    metrics:
+      enabled: true
+      labels:
+        provider: bedrock
+        mode: protocol
+        protocol: openai
+        region: eu-west-1
+
+  # ========================================
+  # Azure OpenAI Instances
+  # ========================================
+
+  # EXAMPLE - Replace with your actual values
+  azure_transparent:
+    type: azure
+    mode: transparent
+    description: "Azure OpenAI native API with authentication"
+
+    # REPLACE WITH YOUR AZURE OPENAI ENDPOINT
+    endpoint: ${AZURE_OPENAI_ENDPOINT:-https://your-resource.openai.azure.com}
+    api_version: ${AZURE_API_VERSION:-2024-02-15-preview}
+
+    # IMPORTANT: Set AZURE_OPENAI_API_KEY environment variable
+    # DO NOT hardcode the API key here!
+    authentication:
+      type: api_key
+      header: api-key
+      key: ${AZURE_OPENAI_API_KEY}  # Set this environment variable
+
+    endpoints:
+      - path: /transparent/azure
+        methods: [GET, POST]
+
+    metrics:
+      enabled: true
+      labels:
+        provider: azure
+        mode: transparent
+
+  # ========================================
+  # OpenAI Direct Instances
+  # ========================================
+
+  # EXAMPLE - Replace with your actual values
+  openai_transparent:
+    type: openai
+    mode: transparent
+    description: "OpenAI native API with authentication"
+
+    base_url: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
+
+    # IMPORTANT: Set OPENAI_API_KEY environment variable
+    # DO NOT hardcode the API key here!
+    authentication:
+      type: bearer_token
+      token: ${OPENAI_API_KEY}  # Set this environment variable
+
+    endpoints:
+      - path: /transparent/openai
+        methods: [GET, POST]
+
+    metrics:
+      enabled: true
+      labels:
+        provider: openai
+        mode: transparent
+
+  # OpenAI-compatible OpenAI (passthrough)
+  openai_openai:
+    type: openai
+    mode: protocol
+    protocol: openai
+    description: "OpenAI via standardized OpenAI protocol"
+
+    base_url: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
+
+    # IMPORTANT: Set OPENAI_API_KEY environment variable
+    authentication:
+      type: bearer_token
+      token: ${OPENAI_API_KEY}
+
+    transformation:
+      request_from: openai
+      request_to: openai
+      response_from: openai
+      response_to: openai
+
+    endpoints:
+      - path: /openai/openai
+        methods: [POST]
+
+    metrics:
+      enabled: true
+      labels:
+        provider: openai
+        mode: protocol
+        protocol: openai
+
+  # ========================================
+  # Anthropic Instances
+  # ========================================
+
+  # EXAMPLE - Replace with your actual values
+  anthropic_transparent:
+    type: anthropic
+    mode: transparent
+    description: "Anthropic native Messages API with authentication"
+
+    base_url: ${ANTHROPIC_BASE_URL:-https://api.anthropic.com/v1}
+    api_version: "2023-06-01"
+
+    # IMPORTANT: Set ANTHROPIC_API_KEY environment variable
+    authentication:
+      type: api_key
+      header: x-api-key
+      key: ${ANTHROPIC_API_KEY}
+
+    endpoints:
+      - path: /transparent/anthropic
+        methods: [POST]
+
+    metrics:
+      enabled: true
+      labels:
+        provider: anthropic
+        mode: transparent
+
+  # ========================================
+  # Google Vertex AI Instances
+  # ========================================
+
+  # EXAMPLE - Replace with your actual values
+  vertex_transparent:
+    type: vertex
+    mode: transparent
+    description: "Google Vertex AI native API with authentication"
+
+    # REPLACE with your GCP project ID
+    project_id: ${GCP_PROJECT_ID:-your-project-id}
+    location: ${GCP_LOCATION:-us-central1}
+
+    # IMPORTANT: Set GCP_ACCESS_TOKEN environment variable
+    # Or use Application Default Credentials (ADC)
+    authentication:
+      type: gcp_oauth2
+      token: ${GCP_ACCESS_TOKEN}
+
+    endpoints:
+      - path: /transparent/vertex
+        methods: [POST]
+
+    metrics:
+      enabled: true
+      labels:
+        provider: vertex
+        mode: transparent
+
+# Routing rules
+routing:
+  # Default instance for each provider
+  defaults:
+    bedrock: bedrock_us1_openai
+    azure: azure_transparent
+    openai: openai_openai
+    anthropic: anthropic_transparent
+    vertex: vertex_transparent
+
+  # Path-based routing
+  path_based:
+    enabled: true
+
+  # Fallback behavior
+  fallback:
+    enabled: true
+    use_default: true
+
+# Feature flags
+features:
+  transparent_mode:
+    enabled: true
+    description: "Enable transparent passthrough endpoints"
+
+  protocol_mode:
+    enabled: true
+    description: "Enable protocol-based transformation endpoints"
+
+  metrics_per_instance:
+    enabled: true
+    description: "Track metrics separately for each instance"
+
+  request_validation:
+    enabled: true
+    description: "Validate requests before forwarding"
+
+# ========================================
+# SECURITY BEST PRACTICES
+# ========================================
+#
+# 1. IAM Roles (Recommended for AWS Bedrock):
+#    - Use EKS IRSA (IAM Roles for Service Accounts)
+#    - No credentials needed in configuration
+#    - Set AWS_ROLE_ARN and AWS_WEB_IDENTITY_TOKEN_FILE environment variables
+#      (automatically set by EKS when using IRSA)
+#
+# 2. Environment Variables:
+#    - Store secrets in Kubernetes Secrets
+#    - Mount as environment variables
+#    - Never commit secrets to version control
+#
+#    Example Kubernetes Secret:
+#    ```yaml
+#    apiVersion: v1
+#    kind: Secret
+#    metadata:
+#      name: ai-gateway-secrets
+#    type: Opaque
+#    stringData:
+#      OPENAI_API_KEY: "sk-..." # Replace with actual key
+#      ANTHROPIC_API_KEY: "sk-ant-..." # Replace with actual key
+#    ```
+#
+# 3. Secret Management:
+#    - Use AWS Secrets Manager, HashiCorp Vault, or similar
+#    - Inject secrets at runtime
+#    - Rotate credentials regularly
+#
+# 4. Least Privilege:
+#    - Grant only required permissions
+#    - Use separate IAM roles per environment
+#    - Audit access regularly
+#
+# ========================================
