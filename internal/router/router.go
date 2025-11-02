@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/bedrock-proxy/bedrock-iam-proxy/internal/providers"
+	"github.com/tosharewith/llmproxy_auth/internal/providers"
 )
 
 // Router handles routing requests to appropriate providers

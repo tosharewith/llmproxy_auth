@@ -3,7 +3,7 @@
 
 package bedrock
 
-import "github.com/bedrock-proxy/bedrock-iam-proxy/internal/providers"
+import "github.com/tosharewith/llmproxy_auth/internal/providers"
 
 // BedrockModels defines all available Bedrock models
 var BedrockModels = []providers.Model{

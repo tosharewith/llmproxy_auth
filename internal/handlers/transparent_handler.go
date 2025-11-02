@@ -9,9 +9,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/bedrock-proxy/bedrock-iam-proxy/internal/instance"
-	"github.com/bedrock-proxy/bedrock-iam-proxy/internal/providers"
-	"github.com/bedrock-proxy/bedrock-iam-proxy/pkg/metrics"
+	"github.com/tosharewith/llmproxy_auth/internal/instance"
+	"github.com/tosharewith/llmproxy_auth/internal/providers"
+	"github.com/tosharewith/llmproxy_auth/pkg/metrics"
 	"github.com/gin-gonic/gin"
 )
 

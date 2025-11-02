@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/bedrock-proxy/bedrock-iam-proxy/internal/auth"
+	"github.com/tosharewith/llmproxy_auth/internal/auth"
 	"github.com/gin-gonic/gin"
 )
 

@@ -1,14 +1,32 @@
-# Bedrock IAM Proxy
+# LLM Proxy Auth
 
-A secure, production-ready AWS Bedrock proxy with embedded IAM role authentication designed for EKS environments.
+A secure, production-ready multi-provider AI Gateway with comprehensive authentication, supporting 7+ AI providers including AWS Bedrock, OpenAI, Anthropic, Azure, Google Vertex AI, IBM watsonx.ai, and Oracle Cloud AI.
+
+Formerly known as Bedrock IAM Proxy.
 
 ## Features
 
+### Core Features
+- **Multi-Provider Support**: AWS Bedrock, OpenAI, Anthropic Claude, Azure OpenAI, Google Vertex AI, IBM watsonx.ai, Oracle Cloud AI
+- **Dual-Mode Architecture**:
+  - **Transparent Mode**: Authentication-only passthrough (preserves native APIs)
+  - **Protocol Mode**: OpenAI-compatible API with request/response translation
 - **Security-First Design**: Distroless container, non-root execution, comprehensive security scanning
+- **OpenAI Compatibility**: Drop-in replacement for OpenAI SDK across all providers
+- **Parameter Translation**: Comprehensive parameter mapping between provider formats
+- **Region-Aware Routing**: Support for multi-region deployments (e.g., Bedrock US/EU)
+
+### Authentication & Security
 - **AWS Integration**: Native EKS IRSA support with fallback to EC2 instance profiles
-- **Observability**: Prometheus metrics, structured logging, health checks
+- **Multiple Auth Methods**: API Key, Basic Auth, TOTP/2FA, Service Account, OAuth2
+- **No Credentials Needed**: For AWS Bedrock using IAM roles (IRSA)
+- **Secret Management**: Kubernetes Secrets, AWS Secrets Manager, HashiCorp Vault integration
+
+### Operations & Observability
+- **Observability**: Prometheus metrics per instance/provider/region, structured logging, health checks
 - **Production-Ready**: Graceful shutdowns, proper error handling, comprehensive testing
 - **Private VPC Support**: Designed for fully private EKS clusters with VPC endpoints
+- **Configuration-Driven**: YAML-based instance configuration with environment variable expansion
 
 ## Architecture
 

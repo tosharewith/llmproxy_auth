@@ -12,8 +12,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/bedrock-proxy/bedrock-iam-proxy/internal/auth"
-	"github.com/bedrock-proxy/bedrock-iam-proxy/internal/providers"
+	"github.com/tosharewith/llmproxy_auth/internal/auth"
+	"github.com/tosharewith/llmproxy_auth/internal/providers"
 )
 
 // BedrockProvider implements the Provider interface for AWS Bedrock

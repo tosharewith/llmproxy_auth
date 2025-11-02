@@ -10,10 +10,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/bedrock-proxy/bedrock-iam-proxy/internal/providers"
-	"github.com/bedrock-proxy/bedrock-iam-proxy/internal/router"
-	"github.com/bedrock-proxy/bedrock-iam-proxy/internal/translator"
-	"github.com/bedrock-proxy/bedrock-iam-proxy/pkg/metrics"
+	"github.com/tosharewith/llmproxy_auth/internal/providers"
+	"github.com/tosharewith/llmproxy_auth/internal/router"
+	"github.com/tosharewith/llmproxy_auth/internal/translator"
+	"github.com/tosharewith/llmproxy_auth/pkg/metrics"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )

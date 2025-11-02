@@ -1,4 +1,4 @@
-module github.com/bedrock-proxy/bedrock-iam-proxy
+module github.com/tosharewith/llmproxy_auth
 
 go 1.24.0
 

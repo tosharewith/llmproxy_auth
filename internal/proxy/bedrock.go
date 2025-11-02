@@ -11,9 +11,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/bedrock-proxy/bedrock-iam-proxy/internal/auth"
-	"github.com/bedrock-proxy/bedrock-iam-proxy/internal/health"
-	"github.com/bedrock-proxy/bedrock-iam-proxy/pkg/metrics"
+	"github.com/tosharewith/llmproxy_auth/internal/auth"
+	"github.com/tosharewith/llmproxy_auth/internal/health"
+	"github.com/tosharewith/llmproxy_auth/pkg/metrics"
 	"github.com/gin-gonic/gin"
 )
 

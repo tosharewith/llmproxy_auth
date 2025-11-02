@@ -12,8 +12,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/bedrock-proxy/bedrock-iam-proxy/internal/providers"
-	"github.com/bedrock-proxy/bedrock-iam-proxy/internal/translator"
+	"github.com/tosharewith/llmproxy_auth/internal/providers"
+	"github.com/tosharewith/llmproxy_auth/internal/translator"
 )
 
 // AnthropicProvider implements the Provider interface for Anthropic Direct API

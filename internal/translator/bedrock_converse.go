@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/bedrock-proxy/bedrock-iam-proxy/internal/providers"
-	"github.com/bedrock-proxy/bedrock-iam-proxy/internal/providers/bedrock"
+	"github.com/tosharewith/llmproxy_auth/internal/providers"
+	"github.com/tosharewith/llmproxy_auth/internal/providers/bedrock"
 )
 
 // Bedrock Converse API types (unified API for all models)

@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/bedrock-proxy/bedrock-iam-proxy/pkg/metrics"
+	"github.com/tosharewith/llmproxy_auth/pkg/metrics"
 	"github.com/gin-gonic/gin"
 )
 
