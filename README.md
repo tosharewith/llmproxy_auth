@@ -168,6 +168,132 @@ flowchart TB
     style K8S_SEC fill:#ffebee
 ```
 
+### Credential Acquisition Flow
+
+When a provider handler needs credentials, it tries configured strategies in priority order:
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Handler as Provider Handler<br/>(Bedrock/Azure/etc)
+    participant Detector as Platform Detector
+    participant Strategy as Credential Strategy
+    participant WI as Workload Identity<br/>(IRSA/Managed Identity)
+    participant Vault as Vault Backend<br/>(HashiCorp/AWS SM/Azure KV)
+    participant K8s as Kubernetes Secret
+    participant Provider as AI Provider
+
+    Client->>Handler: Request to invoke model
+    Handler->>Detector: What platform are we on?
+    Detector-->>Handler: Running on EKS/AKS/GKE/etc
+
+    rect rgb(232, 245, 233)
+    Note over Handler,WI: Strategy 1: Try Workload Identity
+    Handler->>Strategy: Try workload_identity
+    Strategy->>WI: Get credentials
+    alt Workload Identity Available
+        WI-->>Strategy: ✅ Credentials (auto-rotated)
+        Strategy-->>Handler: Success
+        Handler->>Provider: Request with credentials
+        Provider-->>Client: Response
+    else Not Available
+        WI-->>Strategy: ❌ Not available on this platform
+        Note over Handler,Vault: Fallback to Strategy 2
+    end
+    end
+
+    rect rgb(255, 243, 224)
+    Note over Handler,Vault: Strategy 2: Try Vault Backend
+    Handler->>Strategy: Try vault backend
+    Strategy->>Vault: Get secret from HashiCorp/Cloud Vault
+    alt Vault Accessible
+        Vault-->>Strategy: ✅ Credentials from vault
+        Strategy-->>Handler: Success
+        Handler->>Provider: Request with credentials
+        Provider-->>Client: Response
+    else Vault Not Available
+        Vault-->>Strategy: ❌ Vault not configured/accessible
+        Note over Handler,K8s: Fallback to Strategy 3
+    end
+    end
+
+    rect rgb(255, 235, 238)
+    Note over Handler,K8s: Strategy 3: Kubernetes Secret (Last Resort)
+    Handler->>Strategy: Try kubernetes_secret
+    Strategy->>K8s: Read secret from K8s API
+    alt Secret Exists
+        K8s-->>Strategy: ✅ Static credentials
+        Strategy-->>Handler: Success
+        Handler->>Provider: Request with credentials
+        Provider-->>Client: Response
+    else No Secret
+        K8s-->>Strategy: ❌ Secret not found
+        Strategy-->>Handler: ❌ All strategies failed
+        Handler-->>Client: 500 Error - Cannot authenticate
+    end
+    end
+```
+
+**Key Points:**
+- ✅ **Tries strategies in order** until one succeeds
+- ✅ **Auto-detects platform** capabilities at startup
+- ✅ **Caches credentials** until expiry
+- ✅ **Auto-refreshes** before expiration
+- ✅ **Logs which strategy** is active for observability
+
+**Example Configuration:**
+
+```yaml
+# configs/provider-instances.yaml
+instances:
+  bedrock_us1:
+    type: bedrock
+    region: us-east-1
+    authentication:
+      strategies:
+        - type: workload_identity  # Strategy 1
+          provider: aws
+        - type: vault              # Strategy 2
+          backend: hashicorp
+          path: aws/sts/bedrock-role
+        - type: vault              # Strategy 3
+          backend: aws_secrets_manager
+          secret_name: bedrock-api-key
+        - type: kubernetes_secret  # Strategy 4 (fallback)
+          secret_name: bedrock-credentials
+```
+
+**Runtime Behavior on Different Platforms:**
+
+| Platform | Strategy Used | Why |
+|----------|---------------|-----|
+| **AWS EKS** | ✅ `workload_identity` (IRSA) | AWS IRSA available, best option |
+| **Azure AKS** | ⚠️ `vault` (HashiCorp) | AWS IRSA not available, Vault configured |
+| **Google GKE** | ⚠️ `vault` (HashiCorp) | AWS IRSA not available, Vault configured |
+| **Dev Laptop (minikube)** | ⚠️ `kubernetes_secret` | No workload identity, no Vault, uses K8s secret |
+
+**Startup Logs Example (on AWS EKS):**
+
+```
+2025-01-15 10:23:45 INFO  Platform detected: eks
+2025-01-15 10:23:45 INFO  Features available: aws_workload_identity=true
+2025-01-15 10:23:46 INFO  [bedrock_us1] Trying strategy: workload_identity
+2025-01-15 10:23:46 INFO  [bedrock_us1] ✅ Successfully initialized with workload_identity
+2025-01-15 10:23:46 INFO  [bedrock_us1] Credentials will auto-rotate every 60 minutes
+```
+
+**Startup Logs Example (on Azure AKS):**
+
+```
+2025-01-15 10:23:45 INFO  Platform detected: aks
+2025-01-15 10:23:45 INFO  Features available: azure_workload_identity=true
+2025-01-15 10:23:46 INFO  [bedrock_us1] Trying strategy: workload_identity (aws)
+2025-01-15 10:23:46 WARN  [bedrock_us1] ⚠️  AWS workload identity not available on aks
+2025-01-15 10:23:46 INFO  [bedrock_us1] Trying strategy: vault (hashicorp)
+2025-01-15 10:23:47 INFO  [bedrock_us1] ✅ Successfully initialized with vault
+2025-01-15 10:23:47 INFO  [bedrock_us1] Credentials TTL: 3600 seconds
+```
+
 ### Dual-Mode Architecture
 
 The gateway supports two operational modes:
