@@ -1,4 +1,4 @@
-# LLM Proxy Auth
+#Proxy for cloud embedded Auth
 
 A secure, production-ready multi-provider AI Gateway with comprehensive authentication, supporting 7+ AI providers including AWS Bedrock, OpenAI, Anthropic, Azure, Google Vertex AI, IBM watsonx.ai, and Oracle Cloud AI.
 
