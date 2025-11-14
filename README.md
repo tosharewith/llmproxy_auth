@@ -8,6 +8,7 @@ Formerly known as Bedrock IAM Proxy.
 
 ### Core Features
 - **Multi-Provider Support**: AWS Bedrock, OpenAI, Anthropic Claude, Azure OpenAI, Google Vertex AI, IBM watsonx.ai, Oracle Cloud AI
+- **Cloud Storage Access**: S3, Azure Blob, GCP Cloud Storage with pre-signed URL generation
 - **Dual-Mode Architecture**:
   - **Transparent Mode**: Authentication-only passthrough (preserves native APIs)
   - **Protocol Mode**: OpenAI-compatible API with request/response translation
@@ -15,6 +16,7 @@ Formerly known as Bedrock IAM Proxy.
 - **OpenAI Compatibility**: Drop-in replacement for OpenAI SDK across all providers
 - **Parameter Translation**: Comprehensive parameter mapping between provider formats
 - **Region-Aware Routing**: Support for multi-region deployments (e.g., Bedrock US/EU)
+- **RAG Enablement**: Direct access to object storage for document retrieval
 
 ### Authentication & Security
 - **AWS Integration**: Native EKS IRSA support with fallback to EC2 instance profiles
@@ -132,37 +134,68 @@ flowchart TB
     style K8S_SEC fill:#ffebee
 ```
 
-**The Four-Router Architecture:**
+**The Seven-Router Architecture:**
 
-The gateway uses a **layered routing approach** with specialized routers:
+The gateway uses a **layered routing approach** with specialized routers for both AI and storage:
 
 | Router | Purpose | Decision Made |
 |--------|---------|---------------|
 | **1. Auth Router** | User authentication | Valid API key/2FA? Which user? |
-| **2. Mode Router** | Route selection | Transparent mode or Protocol mode? |
-| **3. Model Router** | Provider selection | `claude-3` → Bedrock, `gpt-4` → OpenAI, `gemini` → Vertex |
-| **4. Provider Router** | Handler dispatch | Route to Bedrock/OpenAI/Anthropic/etc handler |
-| **5. Credential Router** | Credential strategy | IRSA? Vault? K8s Secret? |
-| **6. Vault Router** | Vault backend selection | HashiCorp? AWS SM? Azure KV? GCP SM? |
+| **2. Path Router** | Service selection | Storage path (`/-s3/`, `/-azblob/`) or AI provider? |
+| **3. Storage Router** | Storage operation | For storage: get, presign, list, put, delete |
+| **4. Mode Router** | Route selection | For AI: Transparent mode or Protocol mode? |
+| **5. Model Router** | Provider selection | For AI: `claude-3` → Bedrock, `gpt-4` → OpenAI |
+| **6. Provider Router** | Handler dispatch | Route to Bedrock/OpenAI/S3/Azure Blob handler |
+| **7. Credential Router** | Credential strategy | IRSA? Vault? K8s Secret? |
+| **8. Vault Router** | Vault backend selection | HashiCorp? AWS SM? Azure KV? GCP SM? |
 
-**Request Flow:**
+**Request Flow (AI Provider):**
 ```
-Client Request
+Client Request: POST /v1/chat/completions
     ↓
 [1] Auth Router: Validate user credentials
     ↓
-[2] Mode Router: Transparent or Protocol mode?
+[2] Path Router: No storage prefix → AI routing
     ↓
-[3] Model Router: Which provider for this model?
+[3] Mode Router: Transparent or Protocol mode?
     ↓
-[4] Provider Router: Route to specific handler
+[4] Model Router: Which provider for this model?
     ↓
-[5] Credential Router: Get provider credentials
+[5] Provider Router: Route to specific handler
     ↓
-[6] Vault Router: (if needed) Select vault backend
+[6] Credential Router: Get provider credentials
+    ↓
+[7] Vault Router: (if needed) Select vault backend
     ↓
 AI Provider
 ```
+
+**Request Flow (Storage - Pre-Signed URL):**
+```
+Client Request: GET /-s3/prod/presign/my-bucket/doc.pdf
+    ↓
+[1] Auth Router: Validate user credentials
+    ↓
+[2] Path Router: Detects /-s3/ prefix → Storage routing
+    ↓
+[3] Storage Router: Parse: route=prod, operation=presign, bucket=my-bucket, key=doc.pdf
+    ↓
+[4] Credential Router: Get AWS credentials for S3
+    ↓
+[5] Pre-Signed URL Generator: Create temporary signed URL
+    ↓
+Return: {"url": "https://my-bucket.s3.amazonaws.com/doc.pdf?X-Amz-...", "expires_at": ...}
+```
+
+**Storage Path Prefixes:**
+- `/-s3/<route>/<operation>/<bucket>/<path>` - AWS S3
+- `/-azblob/<route>/<operation>/<container>/<path>` - Azure Blob Storage
+- `/-gcpblob/<route>/<operation>/<bucket>/<path>` - GCP Cloud Storage
+- `/-ibmcos/<route>/<operation>/<bucket>/<path>` - IBM Cloud Object Storage
+- `/-ociobj/<route>/<operation>/<bucket>/<path>` - Oracle Object Storage
+- `/-https/<route>/<operation>/<url-path>` - Generic HTTPS with auth injection
+
+See [Storage Routing Documentation](docs/STORAGE-ROUTING.md) for details.
 
 **Benefits:**
 - ✅ **Separation of concerns** - Each router has one job
